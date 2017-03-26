@@ -1,0 +1,96 @@
+from bs4 import BeautifulSoup as bs
+import urllib2
+import MySQLdb as mdb
+import re
+import requests
+import time as ti
+
+headers={'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+'Accept-Language':'zh-CN,zh;q=0.8',
+'Cache-Control':'max-age=0',
+'Connection':'keep-alive',
+'Host':'www.pm25.com',
+'Upgrade-Insecure-Requests':'1',
+'User-Agent':'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2970.0 Safari/537.36'
+}
+url0="http://www.pm25.com/city"
+
+def insertdata(sql):
+    db = mdb.connect("localhost","zhazha","zha1.732","pm25com" )
+    cursor = db.cursor()
+
+    cursor.execute('SET NAMES UTF8')
+    try:
+
+       cursor.execute(sql)
+       db.commit()
+    except:
+       db.rollback()
+       print sql
+       print 'excute this sql error...'
+       return 0
+
+    db.close()
+
+
+def selectdata(i):
+    db = mdb.connect("localhost","zhazha","zha1.732","pm25com" )
+
+    cursor = db.cursor()
+
+    cursor.execute('SET NAMES UTF8')
+    sql="SELECT location FROM `localation` WHERE ID=%d" %(i)
+    try:
+
+       cursor.execute(sql)
+
+       db.commit()
+       results = cursor.fetchall()
+       if (results):
+            for row in results:
+              res = row[0]
+            return res
+    except:
+
+       db.rollback()
+       print sql
+       print 'excute this sql error...'
+       return 0
+    db.close()
+
+p=re.compile('(2017).+')
+for i in range(1000):
+    for i in range(69):
+        cityname=selectdata(i+1)
+        city=cityname+'.html'
+        url=url0+city
+        req=requests.get(url).text
+
+        soup=bs(req,"html.parser")
+        aqi=soup.find("a",class_="cbol_aqi_num")
+        if(aqi):
+            aqi=aqi.get_text().encode("utf-8")
+        #aqi
+        primaryp=soup.find('a',class_="cbol_wuranwu_num")
+        if(primaryp):
+            primaryp=primaryp.get_text().encode("utf-8")
+
+        quality=soup.find('span',class_="cbol_nongdu_num_1")
+        if(quality):
+            quality=quality.get_text().encode("utf-8")
+
+        time=soup.find('div',class_="citydata_updatetime")
+        if(time):
+            time=time.get_text().encode("utf-8")
+            times=re.search(p,time).group()
+        polution=soup.find('span',class_="cbor_gauge_level4")
+        if(polution):
+            polution=polution.get_text().encode("utf-8")
+
+        sql="INSERT INTO `pm25com`(`city`,`aqi`,`primaryp`,`quality`,`times`,`polution`)VALUES('%s','%s','%s','%s','%s','%s')" %(city,aqi,primaryp,quality,times,polution)
+        insertdata(sql)
+        ti.sleep(1)
+    ti.sleep(2500)
+
+
+
